@@ -7,6 +7,9 @@ Coursework for COMP6211 Biometrics at the University of Southampton: identifying
 <p align="center"><img src="docs/images/preprocess-pipeline.png" alt="Pre-processing pipeline" width="560"></p>
 
 1. **Pre-processing** — normalise images, detect body key points with MediaPipe Pose, crop to the body bounding box, and segment the person with GrabCut. Outputs are the body image, a binary mask and landmark coordinates.
+
+   <p align="center"><img src="docs/images/body-mask.png" alt="Binary body mask from GrabCut" width="180"><br><em>Binary body mask produced by GrabCut</em></p>
+
 2. **Feature extraction** — hand-crafted features computed from the masks, grey images and landmarks:
    colour histograms, Hu moments, 2D Gabor filters, contour geometry, Otsu binarisation, skeleton plots, LBP, HOG and body ratios (Euclidean distances between landmarks).
 3. **Classification** — SVMs on HOG / LBP / body-ratio features, a random forest on landmark distances, and a VGG16 transfer-learning CNN (Keras).
