@@ -1,127 +1,68 @@
-# COMP 6211 Biometrics Coursework
+# Body Shape Recognition — COMP6211 Biometrics Coursework
 
-This repository contains the implementation of a body shape recognition system developed as part of the COMP 6211 Biometrics Coursework at the University of Southampton. The project leverages the Southampton Gait Database to explore various feature extraction methods and employs YOLOv8 for robust classification, achieving a Correct Classification Rate (CCR) of up to 59.09%.
+Coursework for COMP6211 Biometrics at the University of Southampton: identifying people from full-body images (front and side views) of 11 subjects on a treadmill in front of a green screen. The project compares hand-crafted shape features with learned models.
 
-## Project Overview
+## Pipeline
 
-The goal of this project is to perform non-intrusive biometric identification based on body shape using the Southampton Gait Database. The dataset includes frontal and side-view images of 11 subjects captured on a static treadmill, introducing challenges such as clothing variations, lighting changes, and pose differences. 
+<p align="center"><img src="docs/images/preprocess-pipeline.png" alt="Pre-processing pipeline" width="560"></p>
 
-Initial experiments tested traditional feature extraction methods, including:
-- Color and intensity histograms
-- Hu Moments
-- Skeleton plots
-- Gabor filters
-- Fourier descriptors
+1. **Pre-processing** — normalise images, detect body key points with MediaPipe Pose, crop to the body bounding box, and segment the person with GrabCut. Outputs are the body image, a binary mask and landmark coordinates.
+2. **Feature extraction** — hand-crafted features computed from the masks, grey images and landmarks:
+   colour histograms, Hu moments, 2D Gabor filters, contour geometry, Otsu binarisation, skeleton plots, LBP, HOG and body ratios (Euclidean distances between landmarks).
+3. **Classification** — SVMs on HOG / LBP / body-ratio features, a random forest on landmark distances, and a VGG16 transfer-learning CNN (Keras).
+4. **Evaluation** — accuracy and confusion matrices on the test set; within/between-class distance and SNR analysis of each feature set.
 
-These methods yielded low CCRs (10%-20%) due to their sensitivity to real-world variations. Consequently, YOLOv8, a state-of-the-art deep learning model, was adopted, achieving a CCR of 50% with hard voting and 59.09% with soft voting, alongside an Equal Error Rate (EER) of 0.32.
-
-## Repository Structure
+## Repository structure
 
 ```
-├── data/
-│   ├── southampton_gait_database/  # Dataset images
-│   └── processed/                 # Pre-processed images and joint data
 ├── src/
-│   ├── preprocess.py              # Data pre-processing with MediaPipe and GrabCut
-│   ├── feature_extraction.py      # Traditional feature extraction methods
-│   ├── yolov8_train.py            # YOLOv8 model training and evaluation
-│   └── utils.py                   # Helper functions
-├── models/
-│   ├── train65/weights/best.pt    # Pre-trained YOLOv8 weights
-│   └── train66/weights/best.pt
-├── results/
-│   ├── plots/                     # Loss curves and confusion matrices
-│   └── metrics.csv                # Performance metrics (CCR, EER)
-├── requirements.txt               # Python dependencies
-└── README.md                      # Project documentation
+│   ├── 01Image_Preprocessing/   # MediaPipe + GrabCut segmentation, data augmentation, landmark extraction
+│   ├── 02Feature_extraction/    # Hu moments, Gabor, HOC, Otsu, landmark-ratio features
+│   ├── 03Models/                # CNN.py (VGG16 transfer learning), Models_Test.py (SVM evaluation)
+│   ├── 04Testing/               # Feature_joblib.py — evaluate saved SVM models, plot confusion matrices
+│   ├── Analysis/                # Feature analysis (within/between distance, SNR), colour histograms, figures
+│   └── main.py                  # Hu-moment extraction and comparison plot
+├── data/
+│   ├── training/                # 88 original images, augmented images, body crops, masks
+│   ├── testing/                 # 22 test images (11 subjects × front/side), organised by identity
+│   └── results/                 # Extracted features (CSV), analysis plots, trained models (*.joblib)
+├── cnn_identity_model.h5 / .keras   # Trained CNN (Git LFS)
+└── vae_model.weights.h5             # VAE weights (Git LFS)
 ```
 
-## Dependencies
+Model files are stored with **Git LFS**. Run `git lfs install` before cloning, or `git lfs pull` afterwards, to download them.
 
-The project requires the following Python libraries:
-- Python 3.8+
-- MediaPipe (`mediapipe`)
-- OpenCV (`opencv-python`)
-- NumPy (`numpy`)
-- Ultralytics YOLO (`ultralytics`)
-- scikit-image (`scikit-image`)
-- Matplotlib (`matplotlib`)
+## Setup
 
-## Installation
+Python 3.9 was used. Install the libraries imported by the scripts:
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-username/comp6211-biometrics.git
-   cd comp6211-biometrics
-   ```
+```bash
+pip install opencv-python mediapipe numpy pandas scikit-learn scikit-image tensorflow matplotlib seaborn scipy joblib imutils
+```
 
-2. Create a virtual environment and install dependencies:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
+`src/01Image_Preprocessing/landmark.py` additionally needs `openpifpaf`.
 
-3. Download the Southampton Gait Database and place it in the `data/southampton_gait_database/` directory. (Note: Access to the dataset may require permission from the University of Southampton.)
-
-4. Download pre-trained YOLOv8 weights (`train65` and `train66`) and place them in the `models/` directory, or train the model from scratch using the provided scripts.
-
-## Usage
-
-1. **Pre-processing**:
-   Run the pre-processing script to generate cropped images and joint point data:
-   ```bash
-   python src/preprocess.py --input data/southampton_gait_database --output data/processed
-   ```
-   This script uses MediaPipe for pose detection, applies morphological operations, and employs GrabCut for precise human segmentation.
-
-2. **Feature Extraction**:
-   Test traditional feature extraction methods:
-   ```bash
-   python src/feature_extraction.py --data data/processed
-   ```
-   This evaluates histograms, Hu Moments, skeleton plots, Gabor filters, and Fourier descriptors.
-
-3. **YOLOv8 Training and Evaluation**:
-   Train the YOLOv8 model:
-   ```bash
-   python src/yolov8_train.py --data data/processed --epochs 75 --img-size 224 --dropout 0.6
-   ```
-   Evaluate the model on the test set:
-   ```bash
-   python src/yolov8_train.py --weights models/train65/weights/best.pt --test
-   ```
-
-4. Results are saved in the `results/` directory, including performance metrics and visualization plots.
+> Most scripts use absolute Windows paths such as `C:\Biometrics\data\...`. Clone the repository to `C:\Biometrics`, or edit the path variables at the top of each script before running.
 
 ## Results
 
-The experiments compared traditional feature extraction methods with YOLOv8. Key findings:
-- **Traditional Methods**:
-  - Histograms: CCR = 10% (sensitive to lighting)
-  - Hu Moments: CCR = 13.64% (poor robustness to clothing)
-  - Skeleton Plots: CCR ≈ 12% (alignment issues)
-  - Gabor Filters: CCR = 18% (limited adaptability)
-  - Fourier Descriptors: CCR ≈ 20% (noise from clothing)
-- **YOLOv8**:
-  - Hard voting: CCR = 50%
-  - Soft voting: CCR = 59.09%
-  - EER = 0.32
+Hand-crafted features performed poorly because they are sensitive to clothing, lighting and pose changes (correct classification rate roughly 10–20%). A YOLO-based classifier performed best: 50% CCR with hard voting and 59.09% with soft voting, with an EER of 0.32.
 
-YOLOv8 outperformed traditional methods due to its ability to learn complex features automatically. Data augmentation (rotation, flipping, brightness adjustment) further improved performance. However, the moderate CCR suggests limitations due to small dataset size and feature overlap across identities.
+<p align="center">
+  <img src="docs/images/confusion-matrix.png" alt="Confusion matrix" width="420">
+  <img src="docs/images/yolo-features-pca.png" alt="PCA of YOLO11 features" width="420">
+</p>
 
-## Future Work
+The PCA plot of YOLO11 features shows some identities forming clear clusters (e.g. identity 08 and 10) while others overlap, which explains the remaining confusion between subjects.
 
-- Collect additional images to enhance dataset diversity.
-- Implement generative models (e.g., CycleGAN) to simulate clothing and background variations.
-- Explore advanced loss functions like Triplet Loss or ArcFace Loss to improve inter-class separation.
+> The YOLO training code is not included in this repository.
 
-## Contact
+## Future work
 
-For questions or collaboration, contact:
-- Yu-Cheng Lai (ycl1c23@soton.ac.uk)
-- GitHub: [Your GitHub Profile]
+- More images per subject to improve dataset diversity
+- Generative augmentation (e.g. CycleGAN) for clothing and background variation
+- Metric-learning losses such as Triplet or ArcFace loss to separate identities
 
----
+## Author
 
-*This project was developed as part of COMP 6211 Biometrics Coursework at the University of Southampton.*
+Yu-Cheng Lai ([YCL-Jeff](https://github.com/YCL-Jeff)), University of Southampton
